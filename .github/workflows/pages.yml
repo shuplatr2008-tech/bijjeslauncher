@@ -1,0 +1,44 @@
+name: Publish BijjesLauncher website
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore: ['README.md']
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare public download
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          RELEASE_URL="https://github.com/$REPOSITORY/releases/download/v1.0.0/BijjesLauncher-1.0.0-arm64.dmg"
+          curl --fail --location --head --retry 3 "$RELEASE_URL"
+          mkdir -p _site
+          cp index.html style.css site.js download.json .nojekyll _site/
+          cp -R assets _site/
+          export RELEASE_URL
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          p = Path('_site/index.html')
+          p.write_text(p.read_text().replace('downloads/BijjesLauncher-1.0.0-arm64.dmg', os.environ['RELEASE_URL']))
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
